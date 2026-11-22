@@ -5,7 +5,7 @@
   "description": "Let AI assistants help review high-value customer orders while ensuring they never bypass spending limits or human approval.",
   "repo": "c2pig/0trust-lab-agentic-transaction",
   "routePath": "/agentic-transaction",
-  "standaloneUrl": "https://agentic-transaction.lab.0trust.dev",
+  "standaloneUrl": "https://lab.0trust.dev/agentic-transaction",
   "localDevPort": 5175,
   "archetype": "A+C",
   "seats": [
