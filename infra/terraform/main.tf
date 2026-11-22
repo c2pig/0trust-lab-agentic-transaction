@@ -8,7 +8,7 @@ module "cloudflare_pages_lab" {
   state_kv_namespace_id = var.state_kv_namespace_id
 
   pages_project_name = "0trust-lab-agentic-transaction"
-  subdomain_prefix   = "agentic-transaction.lab"
+  subdomain_prefix   = "lab-agentic-transaction"
 
   plain_env_vars = {
     ENVIRONMENT = "production"
