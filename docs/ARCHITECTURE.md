@@ -83,3 +83,10 @@ flowchart TB
 2. **Default-Deny Tool & Secret Guardrails**: Any prompt containing secrets/payment cards (`-32002 DLPViolationDetected`) or exceeding role permissions (`-32001 ToolExecutionDenied`) is blocked before reaching the model.
 3. **Mandatory Human Sign-Off**: Automated AI flows can only set `PROCESSING` with a SigV4-signed Bedrock advisory note (and roll back to `BLOCKED` on `504` timeout)—only an authenticated human manager callback (`X-Agent-Callback-Token` verified in constant time) can set `RELEASED`.
 4. **End-to-End Traceability & Per-Visitor Isolation**: Every step, block, and approval shares a single `correlation_id` and W3C `traceparent` streamed into the sticky bottom `XRayTelemetryDrawer`, isolated per visitor in `STATE_KV` with a `1h TTL` (`expirationTtl: 3600`).
+
+---
+
+## Automated Hub Sync & Shell Parity
+- **Standalone Route**: Served at `https://lab.0trust.dev/agentic-transaction` via `0trust-lab-router` (`c2pig/0trust.dev`).
+- **Hub Dispatch (`.github/workflows/sync-to-hub.yml`)**: Fires a `repository_dispatch` (`event_type: lab_contract_updated`) to `c2pig/0trust.dev` whenever `lab.manifest.json` or `docs/diagrams/*.svg` changes on `main`.
+- **Shared Shell (`@0trust/lab-shell`)**: `RoleSwitcherBar.tsx`, `XRayTelemetryDrawer.tsx`, `src/shell/index.ts`, and `src/index.css` are kept in parity with `c2pig/0trust.dev` via `scripts/sync-lab-shell.mjs`.
