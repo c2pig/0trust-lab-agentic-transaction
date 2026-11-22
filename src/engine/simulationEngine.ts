@@ -1071,7 +1071,7 @@ async function tryEdgePost(
 }> {
   if (typeof window !== 'undefined' && agenticEdgeAvailable === null) {
     try {
-      const probe = await fetch('/api/state', { method: 'GET' });
+      const probe = await fetch('/api/agentic-transaction/state', { method: 'GET' });
       const probeCt = probe.headers.get('Content-Type') || '';
       agenticEdgeAvailable = probeCt.includes('application/json');
     } catch {
