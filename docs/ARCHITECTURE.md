@@ -49,7 +49,7 @@ flowchart TB
     subgraph Infra ["Provisioned by managed-infrastructure (Terraform)"]
         TF_Trust["Stack: cross-cloud-trust (AWS OIDC + IAM Roles)"]
         TF_Runtime["Stack: agent-runtime (Cloud Run + Vertex + AgentCore)"]
-        TF_Edge["Stack: 0trust.dev/infra/terraform (Cloudflare Pages + KV + DNS)"]
+        TF_Edge["Stack: infra/terraform (Cloudflare Pages + STATE_KV, enable_custom_domain = false, behind 0trust-lab-router)"]
     end
 
     User --> FnEx & FnExec & FnApp
