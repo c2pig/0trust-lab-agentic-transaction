@@ -1,0 +1,46 @@
+{
+  "id": "agentic-transaction",
+  "title": "Controlled AI Financial Actions",
+  "domainLabel": "Agentic AI & ERP",
+  "description": "Let AI assistants help review high-value customer orders while ensuring they never bypass spending limits or human approval.",
+  "repo": "c2pig/0trust-lab-agentic-transaction",
+  "routePath": "/agentic-transaction",
+  "standaloneUrl": "https://agentic-transaction.lab.0trust.dev",
+  "localDevPort": 5175,
+  "archetype": "A+C",
+  "seats": [
+    {
+      "id": "sales-ops",
+      "persona": "Sarah Chen",
+      "roleLabel": "Sales Ops",
+      "appLabel": "CRM + AI Copilot"
+    },
+    {
+      "id": "ai-sec",
+      "persona": "Marcus Thorne",
+      "roleLabel": "AI Sec",
+      "appLabel": "MCP Policy Console + POE Gate"
+    },
+    {
+      "id": "finance-mgr",
+      "persona": "Elena Vance",
+      "roleLabel": "Finance Manager",
+      "appLabel": "ServiceNow HITL Approval Queue"
+    }
+  ],
+  "apiEndpoints": [
+    "/api/agentic-transaction/exchange",
+    "/api/agentic-transaction/execute",
+    "/api/agentic-transaction/approve",
+    "/api/state"
+  ],
+  "kvPrefixes": ["lab2:agentic:", "lab2:cap:", "playground:v1:"],
+  "infraDependencies": [
+    "managed-infrastructure/modules/cloudflare-pages-lab",
+    "managed-infrastructure/modules/aws-gcp-oidc-trust"
+  ],
+  "diagrams": {
+    "localArchitectureMd": "docs/ARCHITECTURE.md",
+    "zoominSvg": "docs/diagrams/agentic_transaction_architecture.svg"
+  }
+}
