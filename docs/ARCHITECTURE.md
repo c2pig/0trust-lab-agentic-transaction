@@ -2,7 +2,7 @@
 
 > **Zoom Level:** 2.5 (Lab Assembly + Infrastructure Mapping)  
 > **Parent Overview:** [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md)
-> **Experience Archetype:** **Archetype A** (3-Seat Role-Play: *Sales Ops · CRM + AI Copilot* ↔ *AI Sec · MCP Console* ↔ *Finance Manager · Approval Queue*) + **Archetype C** (*Predict–Observe–Explain (POE)* Policy Gate)
+> **Experience Shell:** Compact AppShell with dropdown [`RoleSwitcherBar`](../src/components/RoleSwitcherBar.tsx) (*Sarah Chen · Sales Ops · ApexCRM + AI Copilot* ↔ *Marcus Thorne · AI Security · Agent Activity Monitor* ↔ *Elena Vance · Finance Manager · Finance Approval Inbox*), [`driver.js`](https://driverjs.com/) orientation tour (`Lab Tour`), and sticky-bottom [`XRayTelemetryDrawer`](../src/components/XRayTelemetryDrawer.tsx).
 
 ---
 
