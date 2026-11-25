@@ -54,6 +54,7 @@ export function createCloudRunApp(options?: {
     LAB_ROUTER_SECRET: process.env.LAB_ROUTER_SECRET,
     FIRESTORE_COLLECTION: process.env.FIRESTORE_COLLECTION || 'kv_state',
     SN_AGENT_CALLBACK_TOKEN: process.env.SN_AGENT_CALLBACK_TOKEN,
+    OTEL_SERVICE_NAME: process.env.OTEL_SERVICE_NAME,
     OTLP_ENDPOINT: process.env.OTLP_ENDPOINT,
     OTLP_AUTH_HEADER: process.env.OTLP_AUTH_HEADER
   };
