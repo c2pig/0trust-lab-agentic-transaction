@@ -419,6 +419,7 @@ export function AgenticTransactionPage({
               seats={seats}
               activeSeatId={activeSeat}
               onSelectSeat={setActiveSeat}
+              variant="dropdown"
               ariaLabel="Switch workspace persona"
             />
 
