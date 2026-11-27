@@ -366,4 +366,148 @@ describe('Lab 2 Cloud Run Adapter — Security Invariants & API Flow', () => {
     assert.equal(validCbData.new_status, 'RELEASED');
     assert.equal(validCbData.updated_record.current_status, 'RELEASED');
   });
+
+  it('fails closed on hitl_callback when token is omitted, callback_token_valid=true is spoofed, or production secret is unset', async () => {
+    const kv = new MemoryKvAdapter({ labSlug: 'agentic-transaction' });
+    const app = createCloudRunApp({
+      env: {
+        ENVIRONMENT: 'production',
+        LAB_SLUG: 'agentic-transaction',
+        LAB_ROUTER_SECRET: TEST_ROUTER_SECRET,
+        SN_AGENT_CALLBACK_TOKEN: TEST_CALLBACK_SECRET
+      },
+      kv
+    });
+
+    const sessionId = 'lab2-fail-closed-session';
+
+    // Run bedrock_advisory to move ORD-1042 to PROCESSING and mint per-session hitl_callback_token
+    const advisoryRes = await app.request(
+      'https://0trust-lab-agentic-transaction-abc.run.app/api/agentic-transaction/approve',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-lab-router-secret': TEST_ROUTER_SECRET,
+          'X-Session-Id': sessionId
+        },
+        body: JSON.stringify({ action: 'bedrock_advisory', order_id: 'ORD-1042' })
+      }
+    );
+    assert.equal(advisoryRes.status, 200);
+    const advisoryData = (await advisoryRes.json()) as {
+      hitl_callback_token: string;
+      updated_record: { current_status: string };
+    };
+    assert.equal(typeof advisoryData.hitl_callback_token, 'string');
+    assert.equal(advisoryData.hitl_callback_token.length, 32);
+    assert.equal(advisoryData.updated_record.current_status, 'PROCESSING');
+
+    // 1. Omitted token -> 401, PROCESSING preserved, SECURITY_BLOCK recorded
+    const omittedRes = await app.request(
+      'https://0trust-lab-agentic-transaction-abc.run.app/api/agentic-transaction/approve',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-lab-router-secret': TEST_ROUTER_SECRET,
+          'X-Session-Id': sessionId
+        },
+        body: JSON.stringify({ action: 'hitl_callback', order_id: 'ORD-1042', decision: 'APPROVED' })
+      }
+    );
+    assert.equal(omittedRes.status, 401);
+    const omittedData = (await omittedRes.json()) as {
+      status: string;
+      record_status_preserved: string;
+      sn_audit_events: Array<{ event_type: string }>;
+    };
+    assert.equal(omittedData.status, '401_UNAUTHORIZED_CALLBACK_REJECTED');
+    assert.equal(omittedData.record_status_preserved, 'PROCESSING');
+    assert.equal(omittedData.sn_audit_events[0]?.event_type, 'SECURITY_BLOCK');
+
+    // 2. Spoofed callback_token_valid: true without an explicit token -> 401 (fail-closed)
+    const spoofedFlagRes = await app.request(
+      'https://0trust-lab-agentic-transaction-abc.run.app/api/agentic-transaction/approve',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-lab-router-secret': TEST_ROUTER_SECRET,
+          'X-Session-Id': sessionId
+        },
+        body: JSON.stringify({
+          action: 'hitl_callback',
+          order_id: 'ORD-1042',
+          decision: 'APPROVED',
+          callback_token_valid: true
+        })
+      }
+    );
+    assert.equal(spoofedFlagRes.status, 401);
+    const spoofedFlagData = (await spoofedFlagRes.json()) as { record_status_preserved: string };
+    assert.equal(spoofedFlagData.record_status_preserved, 'PROCESSING');
+
+    // 3. Wrong/forged token -> 401, PROCESSING preserved
+    const forgedRes = await app.request(
+      'https://0trust-lab-agentic-transaction-abc.run.app/api/agentic-transaction/approve',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-lab-router-secret': TEST_ROUTER_SECRET,
+          'X-Session-Id': sessionId,
+          'X-Agent-Callback-Token': 'forged-invalid-callback-token'
+        },
+        body: JSON.stringify({ action: 'hitl_callback', order_id: 'ORD-1042', decision: 'APPROVED' })
+      }
+    );
+    assert.equal(forgedRes.status, 401);
+
+    // 4. Per-session hitl_callback_token returned from bedrock_advisory -> 200 RELEASED
+    const sessionTokenRes = await app.request(
+      'https://0trust-lab-agentic-transaction-abc.run.app/api/agentic-transaction/approve',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-lab-router-secret': TEST_ROUTER_SECRET,
+          'X-Session-Id': sessionId,
+          'X-Agent-Callback-Token': advisoryData.hitl_callback_token
+        },
+        body: JSON.stringify({ action: 'hitl_callback', order_id: 'ORD-1042', decision: 'APPROVED' })
+      }
+    );
+    assert.equal(sessionTokenRes.status, 200);
+    const sessionTokenData = (await sessionTokenRes.json()) as {
+      status: string;
+      updated_record: { current_status: string };
+    };
+    assert.equal(sessionTokenData.status, 'APPROVED_RELEASED');
+    assert.equal(sessionTokenData.updated_record.current_status, 'RELEASED');
+
+    // 5. Production with SN_AGENT_CALLBACK_TOKEN unset and no session token rejects DEFAULT_CALLBACK_SECRET
+    const appNoSecretProd = createCloudRunApp({
+      env: {
+        ENVIRONMENT: 'production',
+        LAB_SLUG: 'agentic-transaction',
+        LAB_ROUTER_SECRET: TEST_ROUTER_SECRET
+      },
+      kv: new MemoryKvAdapter({ labSlug: 'agentic-transaction' })
+    });
+    const defaultSecretAttempt = await appNoSecretProd.request(
+      'https://0trust-lab-agentic-transaction-abc.run.app/api/agentic-transaction/approve',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-lab-router-secret': TEST_ROUTER_SECRET,
+          'X-Session-Id': 'no-secret-prod-session',
+          'X-Agent-Callback-Token': '0trust-sn-hitl-callback-token-v1'
+        },
+        body: JSON.stringify({ action: 'hitl_callback', order_id: 'ORD-1042', decision: 'APPROVED' })
+      }
+    );
+    assert.equal(defaultSecretAttempt.status, 401);
+  });
 });
