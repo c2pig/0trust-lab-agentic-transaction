@@ -117,3 +117,9 @@ flowchart TB
 - **Zero Engine Changes**: All existing same-origin `/api/agentic-transaction/*` requests carry the `HttpOnly` lease cookie automatically; local development (`localhost` / `127.0.0.1`) and disabled lease configs pass through transparently.
 
 - **X-Ray Telemetry Drawer Theme**: Uses Chrome DevTools Light Mode palette (`#ffffff` / `#f1f3f4` surfaces, `#dadce0` borders, `#202124` / `#5f6368` text, `#1a73e8` active indicators) for high-contrast readability.
+
+## 3-Layer Unit Testing Architecture (`tsx --test`)
+
+- **Layer 1 (`tests/server.test.ts`)**: Cloud Run Hono adapter, `X-Lab-Router-Secret` fail-closed `403`, TTL expiry, `X-Forwarded-Host` validation, JWT signature redaction, `413 PAYLOAD_TOO_LARGE` (>64 KB), and `400` malformed JSON / missing `session_id`.
+- **Layer 2 (`tests/api.test.ts`)**: Direct route testing (`state`, `exchange`, `execute`, `approve`) against `MemoryKvAdapter` covering multi-order pending queue concurrency, autonomous spending threshold (`$200`), timeout degradation, and session isolation.
+- **Layer 3 (`tests/selectors.test.ts`, `tests/engine.test.ts`)**: Pure DOM-free UI selectors in `src/engine/agenticSelectors.ts` (multi-order pending badge counts, status labels, action gates) and `src/engine/simulationEngine.ts` stage invariants.

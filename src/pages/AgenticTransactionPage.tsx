@@ -14,6 +14,10 @@ import {
   callStage3ApproveApi,
   createAgenticVisitorSessionId
 } from '../engine/simulationEngine';
+import {
+  getElenaPendingBadge,
+  getGlobalStatusLabel
+} from '../engine/agenticSelectors';
 import { RoleSeatItem, RoleSwitcherBar } from '../components/RoleSwitcherBar';
 import {
   XRayDecodedProofSection,
@@ -109,7 +113,6 @@ export function AgenticTransactionPage({
   const mcpResult = state.mcp_result;
   const sigv4 = state.bedrock_sigv4_inspection;
 
-  const pendingApprovals = state.erp_records.filter((r) => r.current_status === 'PROCESSING');
   const isPendingApproval = selectedRecord?.current_status === 'PROCESSING';
   const isReleased = selectedRecord?.current_status === 'RELEASED';
 
@@ -249,7 +252,7 @@ export function AgenticTransactionPage({
   };
 
   // Elena Vance: Approve or Deny in Finance Approval Inbox
-  const handleManagerDecision = async (decision: 'APPROVED' | 'DENIED', orderId: string) => {
+  const handleManagerDecision = async (decision: 'APPROVED' | 'DENIED') => {
     const currentSid = sessionIdRef.current;
     setApprovalLoading(true);
 
@@ -260,7 +263,7 @@ export function AgenticTransactionPage({
 
     const res = await callStage3ApproveApi(stateRef.current, currentSid, {
       action: 'hitl_callback',
-      orderId,
+      orderId: selectedRecord.order_id,
       decision,
       justification: reasonText,
       tokenValid: true
@@ -273,7 +276,7 @@ export function AgenticTransactionPage({
 
     appendActivityRow({
       actor: 'Elena Vance (Finance Manager)',
-      orderId,
+      orderId: selectedRecord.order_id,
       activity: decision === 'APPROVED' ? 'Approved Order Release' : 'Denied Order Release',
       policyGate: 'Manager Sign-Off',
       status: decision === 'APPROVED' ? 'APPROVED' : 'DENIED'
@@ -291,13 +294,7 @@ export function AgenticTransactionPage({
     onResetLab();
   };
 
-  const globalStatusLabel = isReleased
-    ? 'Order Released'
-    : isPendingApproval
-      ? 'Pending Manager Approval'
-      : tokenBundle?.status === 'VALIDATED'
-        ? 'AI Access Scoped'
-        : 'Ready';
+  const globalStatusLabel = getGlobalStatusLabel(state);
 
   const seats: RoleSeatItem<SeatId>[] = [
     {
@@ -322,10 +319,7 @@ export function AgenticTransactionPage({
       roleLabel: 'Finance Manager',
       appLabel: 'Finance Approval Inbox',
       avatarInitials: 'EV',
-      badge:
-        pendingApprovals.length > 0
-          ? { text: `${pendingApprovals.length} Pending`, tone: 'amber', pulse: true }
-          : null
+      badge: getElenaPendingBadge(state)
     }
   ];
 
@@ -836,14 +830,14 @@ export function AgenticTransactionPage({
               </div>
 
               <div style={{ padding: '18px' }}>
-                {pendingApprovals.length > 0 ? (
+                {isPendingApproval ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <h3 style={{ fontSize: '15.5px', fontWeight: 700 }}>
                         Pending Financial Approvals
                       </h3>
                       <span className="badge badge-amber" style={{ fontSize: '12px' }}>
-                        {pendingApprovals.length} Awaiting Sign-Off
+                        1 Awaiting Sign-Off
                       </span>
                     </div>
 
@@ -858,61 +852,59 @@ export function AgenticTransactionPage({
                           </tr>
                         </thead>
                         <tbody>
-                          {pendingApprovals.map((record) => (
-                            <tr key={record.order_id}>
-                              <td>
-                                <div style={{ fontWeight: 700 }}>Sarah Chen</div>
-                                <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)' }}>
-                                  Sales Ops (via AI Copilot)
-                                </div>
-                              </td>
-                              <td>
-                                <div style={{ fontWeight: 700 }}>
-                                  {record.order_id} · {formatUsd(record.amount_usd)}
-                                </div>
-                                <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)' }}>
-                                  {record.customer_name}
-                                </div>
-                              </td>
-                              <td style={{ minWidth: '260px' }}>
-                                <input
-                                  type="text"
-                                  value={justification}
-                                  onChange={(e) => setJustification(e.target.value)}
-                                  className="input-control"
-                                  style={{ fontSize: '13px' }}
-                                />
-                              </td>
-                              <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                                <div style={{ display: 'inline-flex', gap: '8px' }}>
-                                  <button
-                                    type="button"
-                                    className="btn btn-sm"
-                                    style={{ fontSize: '13px', padding: '7px 12px' }}
-                                    disabled={approvalLoading}
-                                    onClick={() => void handleManagerDecision('DENIED', record.order_id)}
-                                  >
-                                    Deny
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="btn btn-sm"
-                                    disabled={approvalLoading}
-                                    onClick={() => void handleManagerDecision('APPROVED', record.order_id)}
-                                    style={{
-                                      fontSize: '13px',
-                                      padding: '7px 14px',
-                                      backgroundColor: '#7c3aed',
-                                      borderColor: '#7c3aed',
-                                      color: '#ffffff'
-                                    }}
-                                  >
-                                    {approvalLoading ? 'Approving…' : 'Approve Release'}
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
+                          <tr>
+                            <td>
+                              <div style={{ fontWeight: 700 }}>Sarah Chen</div>
+                              <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)' }}>
+                                Sales Ops (via AI Copilot)
+                              </div>
+                            </td>
+                            <td>
+                              <div style={{ fontWeight: 700 }}>
+                                {selectedRecord.order_id} · {formatUsd(selectedRecord.amount_usd)}
+                              </div>
+                              <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)' }}>
+                                {selectedRecord.customer_name}
+                              </div>
+                            </td>
+                            <td style={{ minWidth: '260px' }}>
+                              <input
+                                type="text"
+                                value={justification}
+                                onChange={(e) => setJustification(e.target.value)}
+                                className="input-control"
+                                style={{ fontSize: '13px' }}
+                              />
+                            </td>
+                            <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                              <div style={{ display: 'inline-flex', gap: '8px' }}>
+                                <button
+                                  type="button"
+                                  className="btn btn-sm"
+                                  style={{ fontSize: '13px', padding: '7px 12px' }}
+                                  disabled={approvalLoading}
+                                  onClick={() => void handleManagerDecision('DENIED')}
+                                >
+                                  Deny
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-sm"
+                                  disabled={approvalLoading}
+                                  onClick={() => void handleManagerDecision('APPROVED')}
+                                  style={{
+                                    fontSize: '13px',
+                                    padding: '7px 14px',
+                                    backgroundColor: '#7c3aed',
+                                    borderColor: '#7c3aed',
+                                    color: '#ffffff'
+                                  }}
+                                >
+                                  {approvalLoading ? 'Approving…' : 'Approve Release'}
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
                         </tbody>
                       </table>
                     </div>

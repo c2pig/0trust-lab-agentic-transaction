@@ -62,8 +62,9 @@ function getSourceTableForProcess(process: ErpProcessStage): string {
 
 export function savePlaygroundState(state: PlaygroundState): void {
   try {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const ls = (globalThis as { localStorage?: { setItem(k: string, v: string): void } }).localStorage;
+    if (ls) {
+      ls.setItem(STORAGE_KEY, JSON.stringify(state));
     }
   } catch {
     // Ignore storage quota or private browsing errors
@@ -141,8 +142,9 @@ export function resetToCanonicalSeed(
 
 export function loadPlaygroundState(): PlaygroundState {
   try {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
+    const ls = (globalThis as { localStorage?: { getItem(k: string): string | null } }).localStorage;
+    if (ls) {
+      const raw = ls.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as PlaygroundState;
         if (parsed && parsed.next_weekly_reset_utc) {
@@ -1070,7 +1072,7 @@ async function tryEdgePost(
   json: Record<string, unknown> | null;
   latencyMs: number;
 }> {
-  if (typeof window !== 'undefined' && agenticEdgeAvailable === null) {
+  if (typeof (globalThis as { window?: unknown }).window !== 'undefined' && agenticEdgeAvailable === null) {
     try {
       const probe = await fetch('/api/agentic-transaction/state', { method: 'GET' });
       const probeCt = probe.headers.get('Content-Type') || '';
