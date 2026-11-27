@@ -1062,7 +1062,8 @@ async function tryEdgePost(
   sessionId: string,
   traceparent: string,
   authHeader: string | null,
-  body: Record<string, unknown>
+  body: Record<string, unknown>,
+  extraHeaders: Record<string, string> = {}
 ): Promise<{
   handledByEdge: boolean;
   status: number;
@@ -1086,7 +1087,8 @@ async function tryEdgePost(
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'X-Session-Id': sessionId,
-      traceparent
+      traceparent,
+      ...extraHeaders
     };
     if (authHeader) {
       headers['Authorization'] = authHeader;
@@ -1350,12 +1352,22 @@ export async function callStage3ApproveApi(
           callback_token_valid: params.tokenValid
         };
 
+  const extraHeaders: Record<string, string> =
+    params.action === 'hitl_callback'
+      ? {
+          'X-Agent-Callback-Token': params.tokenValid
+            ? state.hitl_callback_token || ''
+            : 'forged-invalid-callback-token'
+        }
+      : {};
+
   const edgeRes = await tryEdgePost(
     path,
     sessionId,
     traceInfo.traceparent,
     authHeader,
-    requestBody
+    requestBody,
+    extraHeaders
   );
 
   const fallbackStatus =
@@ -1369,9 +1381,16 @@ export async function callStage3ApproveApi(
 
   const httpStatus = edgeRes.handledByEdge ? edgeRes.status : fallbackStatus;
 
-  savePlaygroundState(localNext);
+  const nextState: PlaygroundState =
+    params.action === 'bedrock_advisory' &&
+    edgeRes.handledByEdge &&
+    typeof edgeRes.json?.hitl_callback_token === 'string'
+      ? { ...localNext, hitl_callback_token: edgeRes.json.hitl_callback_token }
+      : localNext;
 
-  const updatedOrder = localNext.erp_records.find((r) => r.order_id === params.orderId);
+  savePlaygroundState(nextState);
+
+  const updatedOrder = nextState.erp_records.find((r) => r.order_id === params.orderId);
 
   const span = buildObservabilitySpan({
     path,
@@ -1388,7 +1407,7 @@ export async function callStage3ApproveApi(
             action: 'bedrock_advisory',
             order_id: params.orderId,
             http_status: httpStatus,
-            aws_request_id: localNext.bedrock_sigv4_inspection?.aws_request_id,
+            aws_request_id: nextState.bedrock_sigv4_inspection?.aws_request_id,
             record_status: updatedOrder?.current_status,
             kv_ttl_seconds: 3600
           }
@@ -1406,7 +1425,7 @@ export async function callStage3ApproveApi(
   return {
     ok: httpStatus >= 200 && httpStatus < 300,
     status: httpStatus,
-    nextState: localNext,
+    nextState,
     span
   };
 }

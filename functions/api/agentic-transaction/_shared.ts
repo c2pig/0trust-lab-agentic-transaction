@@ -54,11 +54,13 @@ export interface AgenticSessionRecord {
   erp_records: ErpExceptionRecord[];
   sn_audit_events: ServiceNowAuditEvent[];
   sys_audit_log: SysAuditEntry[];
+  hitl_callback_token?: string | null;
   updated_at: string;
 }
 
 const ephemeralAgenticSessionStore = new Map<string, { value: string; expiresAt: number }>();
 const ephemeralAgenticCapStore = new Map<string, { value: string; expiresAt: number }>();
+const MAX_EPHEMERAL_ENTRIES = 500;
 
 function getEphemeral(
   store: Map<string, { value: string; expiresAt: number }>,
@@ -79,7 +81,20 @@ function putEphemeral(
   value: string,
   ttlSeconds: number
 ): void {
-  store.set(key, { value, expiresAt: Date.now() + ttlSeconds * 1000 });
+  const now = Date.now();
+  if (store.size >= MAX_EPHEMERAL_ENTRIES && !store.has(key)) {
+    for (const [existingKey, existingEntry] of store) {
+      if (now > existingEntry.expiresAt) {
+        store.delete(existingKey);
+      }
+    }
+    while (store.size >= MAX_EPHEMERAL_ENTRIES) {
+      const oldestKey = store.keys().next().value;
+      if (oldestKey === undefined) break;
+      store.delete(oldestKey);
+    }
+  }
+  store.set(key, { value, expiresAt: now + ttlSeconds * 1000 });
 }
 
 export function agenticSessionKey(sessionId: string): string {
@@ -99,6 +114,12 @@ export function jsonResponse(body: unknown, status = 200): Response {
       'Cache-Control': 'no-store'
     }
   });
+}
+
+export function generateCallbackToken(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 export function constantTimeEqual(a: string, b: string): boolean {
@@ -164,6 +185,7 @@ export function createInitialAgenticSession(sessionId: string): AgenticSessionRe
         user: 'system.sap_ecc_sync'
       }
     ],
+    hitl_callback_token: null,
     updated_at: nowIso
   };
 }

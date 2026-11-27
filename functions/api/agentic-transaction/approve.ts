@@ -4,6 +4,7 @@ import {
   checkAndIncrementDailyCap,
   constantTimeEqual,
   DEFAULT_CALLBACK_SECRET,
+  generateCallbackToken,
   getSourceTableForProcess,
   jsonResponse,
   loadAgenticSession,
@@ -276,13 +277,16 @@ export async function onRequestPost(context: {
       }
     };
 
+    const hitlCallbackToken = generateCallbackToken();
+
     const updatedSession = {
       ...session,
       selected_order_id: targetRecord.order_id,
       bedrock_sigv4_inspection: sigv4Inspection,
       erp_records: updatedRecords,
       sn_audit_events: [bedrockSuccessEvent, buttonEvent, ...session.sn_audit_events],
-      sys_audit_log: [sysAuditToProcessing, ...session.sys_audit_log]
+      sys_audit_log: [sysAuditToProcessing, ...session.sys_audit_log],
+      hitl_callback_token: hitlCallbackToken
     };
 
     const storage = await saveAgenticSession(context.env, sessionId, updatedSession);
@@ -294,6 +298,7 @@ export async function onRequestPost(context: {
         action: 'bedrock_advisory',
         order_id: targetRecord.order_id,
         aws_request_id: awsRequestId,
+        hitl_callback_token: hitlCallbackToken,
         bedrock_sigv4_inspection: sigv4Inspection,
         updated_record: updatedRecords.find((r) => r.order_id === targetRecord.order_id),
         sn_audit_events: [bedrockSuccessEvent, buttonEvent],
@@ -309,21 +314,29 @@ export async function onRequestPost(context: {
   }
 
   // ==================== BRANCH 2: HITL CALLBACK (CONSTANT-TIME TOKEN CHECK) ====================
-  const expectedSecret = context.env.SN_AGENT_CALLBACK_TOKEN || DEFAULT_CALLBACK_SECRET;
+  const isProd = context.env.ENVIRONMENT === 'production';
+  const configuredSecret =
+    context.env.SN_AGENT_CALLBACK_TOKEN || (isProd ? '' : DEFAULT_CALLBACK_SECRET);
+  const sessionToken =
+    typeof session.hitl_callback_token === 'string' ? session.hitl_callback_token : '';
+
   const headerToken = context.request.headers.get('X-Agent-Callback-Token');
   const candidateToken =
     headerToken !== null
       ? headerToken
       : typeof body.callback_token === 'string'
         ? body.callback_token
-        : body.callback_token_valid === false
-          ? 'forged-invalid-callback-token'
-          : expectedSecret;
+        : '';
+
+  const matchesConfigured =
+    configuredSecret.length > 0 && constantTimeEqual(candidateToken, configuredSecret);
+  const matchesSession =
+    sessionToken.length > 0 && constantTimeEqual(candidateToken, sessionToken);
 
   const isTokenValid =
-    body.callback_token_valid === false
-      ? false
-      : constantTimeEqual(candidateToken, expectedSecret);
+    candidateToken.length > 0 &&
+    body.callback_token_valid !== false &&
+    (matchesConfigured || matchesSession);
 
   const awsRequestId =
     targetRecord.aws_request_id !== 'pending_invocation'

@@ -24,12 +24,11 @@ env:
   CLOUD_RUN_SERVICE: zerotrust-lab-agentic-transaction
 
 jobs:
-  deploy-pages:
-    name: Deploy Static SPA to Cloudflare Pages
+  test-and-build:
+    name: Typecheck, Test & Build
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      deployments: write
     steps:
       - name: Checkout 0trust-lab-agentic-transaction
         uses: actions/checkout@v4
@@ -45,21 +44,13 @@ jobs:
 
       - name: Typecheck, Test & Build Production Bundle
         run: |
+          npm run typecheck
           npm test
           npm run build
 
-      - name: Remove functions/ so Cloudflare Pages uploads static dist/ only
-        run: rm -rf functions
-
-      - name: Deploy Static dist/ to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=0trust-lab-agentic-transaction --branch=main
-
   deploy-cloudrun:
     name: Build & Deploy API to GCP Cloud Run
+    needs: test-and-build
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -93,3 +84,40 @@ jobs:
           service: ${{ env.CLOUD_RUN_SERVICE }}
           region: ${{ env.GCP_REGION }}
           image: ${{ env.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/zerotrust-labs/${{ env.LAB_SLUG }}:${{ github.sha }}
+
+  deploy-pages:
+    name: Deploy Static SPA to Cloudflare Pages
+    needs:
+      - test-and-build
+      - deploy-cloudrun
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - name: Checkout 0trust-lab-agentic-transaction
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck, Test & Build Production Bundle
+        run: |
+          npm test
+          npm run build
+
+      - name: Remove functions/ so Cloudflare Pages uploads static dist/ only
+        run: rm -rf functions
+
+      - name: Deploy Static dist/ to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=0trust-lab-agentic-transaction --branch=main

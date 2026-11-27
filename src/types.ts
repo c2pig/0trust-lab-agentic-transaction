@@ -159,6 +159,7 @@ export interface PlaygroundState {
   sn_audit_events: ServiceNowAuditEvent[];
   sys_audit_log: SysAuditEntry[];
   telemetry_stream: TelemetryLogEntry[];
+  hitl_callback_token?: string | null;
 }
 
 export interface ObservabilitySpan {
