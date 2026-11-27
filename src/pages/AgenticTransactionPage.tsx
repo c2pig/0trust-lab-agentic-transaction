@@ -14,6 +14,10 @@ import {
   callStage3ApproveApi,
   createAgenticVisitorSessionId
 } from '../engine/simulationEngine';
+import {
+  getElenaPendingBadge,
+  getGlobalStatusLabel
+} from '../engine/agenticSelectors';
 import { RoleSeatItem, RoleSwitcherBar } from '../components/RoleSwitcherBar';
 import {
   XRayDecodedProofSection,
@@ -290,13 +294,7 @@ export function AgenticTransactionPage({
     onResetLab();
   };
 
-  const globalStatusLabel = isReleased
-    ? 'Order Released'
-    : isPendingApproval
-      ? 'Pending Manager Approval'
-      : tokenBundle?.status === 'VALIDATED'
-        ? 'AI Access Scoped'
-        : 'Ready';
+  const globalStatusLabel = getGlobalStatusLabel(state);
 
   const seats: RoleSeatItem<SeatId>[] = [
     {
@@ -321,7 +319,7 @@ export function AgenticTransactionPage({
       roleLabel: 'Finance Manager',
       appLabel: 'Finance Approval Inbox',
       avatarInitials: 'EV',
-      badge: isPendingApproval ? { text: '1 Pending', tone: 'amber', pulse: true } : null
+      badge: getElenaPendingBadge(state)
     }
   ];
 

@@ -510,4 +510,74 @@ describe('Lab 2 Cloud Run Adapter — Security Invariants & API Flow', () => {
     );
     assert.equal(defaultSecretAttempt.status, 401);
   });
+
+  it('rejects oversized (>64 KB) JSON bodies with 413 PAYLOAD_TOO_LARGE across POST endpoints', async () => {
+    const app = createCloudRunApp({
+      env: {
+        ENVIRONMENT: 'production',
+        LAB_SLUG: 'agentic-transaction',
+        LAB_ROUTER_SECRET: TEST_ROUTER_SECRET
+      },
+      kv: new MemoryKvAdapter({ labSlug: 'agentic-transaction' })
+    });
+    const oversizedBody = JSON.stringify({ pad: 'a'.repeat(70_000) });
+
+    for (const endpoint of ['exchange', 'execute', 'approve'] as const) {
+      const res = await app.request(
+        `https://0trust-lab-agentic-transaction-abc.run.app/api/agentic-transaction/${endpoint}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-lab-router-secret': TEST_ROUTER_SECRET,
+            'X-Session-Id': 'oversized-session'
+          },
+          body: oversizedBody
+        }
+      );
+      assert.equal(res.status, 413, `Expected 413 for /api/agentic-transaction/${endpoint}`);
+      const data = (await res.json()) as { error?: string };
+      assert.equal(data.error, 'PAYLOAD_TOO_LARGE');
+    }
+  });
+
+  it('fails closed with 400 on malformed JSON or missing session_id', async () => {
+    const app = createCloudRunApp({
+      env: {
+        ENVIRONMENT: 'production',
+        LAB_SLUG: 'agentic-transaction',
+        LAB_ROUTER_SECRET: TEST_ROUTER_SECRET
+      },
+      kv: new MemoryKvAdapter({ labSlug: 'agentic-transaction' })
+    });
+
+    // Malformed JSON
+    const malformedRes = await app.request(
+      'https://0trust-lab-agentic-transaction-abc.run.app/api/agentic-transaction/exchange',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-lab-router-secret': TEST_ROUTER_SECRET,
+          'X-Session-Id': 'malformed-session'
+        },
+        body: '{not-valid-json'
+      }
+    );
+    assert.equal(malformedRes.status, 400);
+
+    // Missing session_id on POST /state defaults to canonical and fails closed with 403
+    const missingSessionRes = await app.request(
+      'https://0trust-lab-agentic-transaction-abc.run.app/api/agentic-transaction/state',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-lab-router-secret': TEST_ROUTER_SECRET
+        },
+        body: JSON.stringify({ test: true })
+      }
+    );
+    assert.equal(missingSessionRes.status, 403);
+  });
 });
