@@ -6,6 +6,7 @@ import {
   savePlaygroundState
 } from './engine/simulationEngine';
 import { AgenticTransactionPage } from './pages/AgenticTransactionPage';
+import { LabLeaseGuard } from './shell';
 
 export default function App() {
   const [playgroundState, setPlaygroundState] = useState<PlaygroundState>(() =>
@@ -31,11 +32,13 @@ export default function App() {
   };
 
   return (
-    <AgenticTransactionPage
-      state={playgroundState}
-      onChangeState={handleStateChange}
-      onBackHome={handleBackHome}
-      onResetLab={handleReset}
-    />
+    <LabLeaseGuard labSlug="agentic-transaction" labTitle="Controlled AI Financial Actions">
+      <AgenticTransactionPage
+        state={playgroundState}
+        onChangeState={handleStateChange}
+        onBackHome={handleBackHome}
+        onResetLab={handleReset}
+      />
+    </LabLeaseGuard>
   );
 }
