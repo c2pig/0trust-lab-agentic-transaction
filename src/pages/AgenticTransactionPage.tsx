@@ -12,7 +12,9 @@ import {
   callStage1ExchangeApi,
   callStage2ExecuteApi,
   callStage3ApproveApi,
-  createAgenticVisitorSessionId
+  clearPlaygroundState,
+  createAgenticVisitorSessionId,
+  resetToCanonicalSeed
 } from '../engine/simulationEngine';
 import {
   getElenaPendingBadge,
@@ -25,10 +27,7 @@ import {
 } from '../components/XRayTelemetryDrawer';
 
 export interface AgenticTransactionPageProps {
-  state: PlaygroundState;
-  onChangeState: (next: PlaygroundState) => void;
   onBackHome: () => void;
-  onResetLab: () => void;
 }
 
 type SeatId = 'sales-ops' | 'ai-sec' | 'finance-mgr';
@@ -69,11 +68,14 @@ function getStatusBadge(status: ErpRecordStatus) {
 }
 
 export function AgenticTransactionPage({
-  state,
-  onChangeState,
-  onBackHome,
-  onResetLab
+  onBackHome
 }: AgenticTransactionPageProps) {
+  const [state, setState] = useState<PlaygroundState>(() => {
+    clearPlaygroundState();
+    return resetToCanonicalSeed('MANUAL_RESET');
+  });
+  const onChangeState = setState;
+
   const [sessionId, setSessionId] = useState<string>(() => createAgenticVisitorSessionId());
   const sessionIdRef = useRef<string>(sessionId);
   sessionIdRef.current = sessionId;
@@ -284,6 +286,8 @@ export function AgenticTransactionPage({
   };
 
   const handleReset = () => {
+    clearPlaygroundState();
+    setState(resetToCanonicalSeed('MANUAL_RESET'));
     setSessionId(createAgenticVisitorSessionId());
     setActiveSeat('sales-ops');
     setCopilotLoading(false);
@@ -291,7 +295,6 @@ export function AgenticTransactionPage({
     setJustification(DEFAULT_JUSTIFICATION);
     setActivityRows([]);
     setSpans([]);
-    onResetLab();
   };
 
   const globalStatusLabel = getGlobalStatusLabel(state);

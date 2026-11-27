@@ -1,11 +1,14 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  clearPlaygroundState,
   executeStage1TokenExchange,
   executeStage2McpPolicy,
   executeStage3BedrockAudit,
   executeStage3HitlCallback,
-  resetToCanonicalSeed
+  loadPlaygroundState,
+  resetToCanonicalSeed,
+  savePlaygroundState
 } from '../src/engine/simulationEngine';
 
 describe('Layer 3: Simulation Engine Invariants', () => {
@@ -52,5 +55,37 @@ describe('Layer 3: Simulation Engine Invariants', () => {
       released.erp_records.find((r) => r.order_id === 'ORD-1042')?.current_status,
       'RELEASED'
     );
+  });
+
+  it('does not persist or reload mutated state across leases via localStorage', () => {
+    const store = new Map<string, string>();
+    const prevStorage = (globalThis as { localStorage?: unknown }).localStorage;
+    (globalThis as { localStorage?: unknown }).localStorage = {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        store.set(k, v);
+      },
+      removeItem: (k: string) => {
+        store.delete(k);
+      }
+    };
+
+    try {
+      const mutated = executeStage1TokenExchange(resetToCanonicalSeed(), 'NONE');
+      savePlaygroundState(mutated);
+      assert.equal(store.size, 0);
+
+      // Even if a legacy entry exists in localStorage, loadPlaygroundState clears it and returns fresh seed
+      store.set('0trust_agentic_tx_state_v1', JSON.stringify(mutated));
+      const reloaded = loadPlaygroundState();
+      assert.equal(reloaded.token_bundle, null);
+      assert.equal(store.has('0trust_agentic_tx_state_v1'), false);
+
+      store.set('0trust_agentic_tx_state_v1', JSON.stringify(mutated));
+      clearPlaygroundState();
+      assert.equal(store.has('0trust_agentic_tx_state_v1'), false);
+    } finally {
+      (globalThis as { localStorage?: unknown }).localStorage = prevStorage;
+    }
   });
 });

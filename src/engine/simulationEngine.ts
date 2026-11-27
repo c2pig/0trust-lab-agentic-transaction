@@ -60,15 +60,19 @@ function getSourceTableForProcess(process: ErpProcessStage): string {
   }
 }
 
-export function savePlaygroundState(state: PlaygroundState): void {
+export function clearPlaygroundState(): void {
   try {
-    const ls = (globalThis as { localStorage?: { setItem(k: string, v: string): void } }).localStorage;
+    const ls = (globalThis as { localStorage?: { removeItem(k: string): void } }).localStorage;
     if (ls) {
-      ls.setItem(STORAGE_KEY, JSON.stringify(state));
+      ls.removeItem(STORAGE_KEY);
     }
   } catch {
     // Ignore storage quota or private browsing errors
   }
+}
+
+export function savePlaygroundState(_state: PlaygroundState): void {
+  // Intentionally do not persist sandbox state across leases in localStorage
 }
 
 export function resetToCanonicalSeed(
@@ -141,24 +145,7 @@ export function resetToCanonicalSeed(
 }
 
 export function loadPlaygroundState(): PlaygroundState {
-  try {
-    const ls = (globalThis as { localStorage?: { getItem(k: string): string | null } }).localStorage;
-    if (ls) {
-      const raw = ls.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as PlaygroundState;
-        if (parsed && parsed.next_weekly_reset_utc) {
-          const nextResetMs = Date.parse(parsed.next_weekly_reset_utc);
-          if (!Number.isNaN(nextResetMs) && Date.now() >= nextResetMs) {
-            return resetToCanonicalSeed('WEEKLY_CRON_RESET');
-          }
-          return parsed;
-        }
-      }
-    }
-  } catch {
-    // Fall back to fresh canonical seed
-  }
+  clearPlaygroundState();
   return resetToCanonicalSeed('MANUAL_RESET');
 }
 
