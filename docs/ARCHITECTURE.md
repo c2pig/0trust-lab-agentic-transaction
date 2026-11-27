@@ -112,7 +112,8 @@ flowchart TB
 ---
 
 ## Turnstile & 3-Minute Single-Session Lease Gate
-- **Frontend Guard (`src/components/LabLeaseGuard.tsx`, re-exported via `src/shell/index.ts`)**: `src/App.tsx` wraps `<AgenticTransactionPage>` with `<LabLeaseGuard labSlug="agentic-transaction" labTitle="Controlled AI Financial Actions">`.
+- **Frontend Guard (`src/components/LabLeaseGuard.tsx`, re-exported via `src/shell/index.ts`)**: `src/App.tsx` wraps `<AgenticTransactionPage>` with `<LabLeaseGuard labSlug="agentic-transaction" labTitle="Controlled AI Financial Actions" onLeaseEnded={clearPlaygroundState}>`.
+- **Lease-Scoped State Isolation**: `playgroundState` is owned inside `<AgenticTransactionPage>` (unmounted when the lease ends or expires) and initialized from `resetToCanonicalSeed('MANUAL_RESET')` with a fresh `createAgenticVisitorSessionId()`. Cross-lease `localStorage` persistence (`0trust_agentic_tx_state_v1`) is disabled (`savePlaygroundState` is a no-op; `loadPlaygroundState` / `clearPlaygroundState` purge any legacy key).
 - **Edge Enforcement (`0trust-lab-router` + `LabLeaseDO`)**: Queries `GET /api/lease/agentic-transaction/status`, renders the explicit Cloudflare Turnstile widget (`0x4AAAAAAGVF1oWC5CsFWn-J`) when available, acquires an `HttpOnly; Secure; SameSite=Lax` lease cookie (`lab_lease_agentic-transaction`) via `POST /api/lease/agentic-transaction/acquire` (180s hard cap, 25 calls/lease, 200 calls/UTC day), shows a countdown lock screen when occupied, and exposes a floating `MM:SS + End Lab` pill while active.
 - **Zero Engine Changes**: All existing same-origin `/api/agentic-transaction/*` requests carry the `HttpOnly` lease cookie automatically; local development (`localhost` / `127.0.0.1`) and disabled lease configs pass through transparently.
 
